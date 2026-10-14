@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Classes - Google Classroom</title>
+  <script>
+    // GitHub Pages SPA redirect
+    sessionStorage.redirect = location.href;
+    var pathname = location.pathname;
+    var repoName = pathname.split('/')[1] || '';
+    if (repoName) {
+      location.replace('/' + repoName + '/');
+    } else {
+      location.replace('./');
+    }
+  </script>
+</head>
+<body>
+</body>
+</html>
