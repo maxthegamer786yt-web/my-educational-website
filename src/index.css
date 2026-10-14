@@ -1,0 +1,29 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    background-color: #05010a;
+    color: #f3e8ff;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom scrollbars in black and purple */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #05010a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2e1065;
+  border-radius: 4px;
+  border: 1px solid #4c1d95;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #581c87;
+}

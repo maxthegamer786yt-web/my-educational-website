@@ -1,0 +1,8 @@
+{
+  "name": "goon arcade",
+  "description": "Fast, unblocked browser games library featuring instant iframe play, favorites, custom game embeds, and stealth tab cloaking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

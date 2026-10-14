@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dino Desert Runner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      background: #020617;
+      border: 3px solid #f59e0b;
+      border-radius: 8px;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+    }
+    canvas { display: block; }
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 580px;
+      margin-bottom: 10px;
+      font-size: 15px;
+      font-weight: bold;
+    }
+    .hud span { color: #f59e0b; }
+    .overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(2, 6, 23, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+    }
+    .btn {
+      background: #f59e0b;
+      color: #020617;
+      border: none;
+      padding: 10px 24px;
+      font-size: 16px;
+      font-weight: 800;
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .btn:hover { background: #fbbf24; transform: scale(1.05); }
+    .hint {
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="hud">
+    <div>SCORE: <span id="score-val">00000</span></div>
+    <div>HI-SCORE: <span id="high-val">00000</span></div>
+  </div>
+
+  <div id="game-container">
+    <canvas id="canvas" width="580" height="280"></canvas>
+    <div id="start-overlay" class="overlay">
+      <h2 style="font-size: 30px; color: #f59e0b;">DINO RUNNER</h2>
+      <p style="color: #94a3b8; font-size: 13px;">Jump over cacti and duck obstacles! Speed increases over time.</p>
+      <button class="btn" id="start-btn">START SPRINT</button>
+    </div>
+    <div id="gameover-overlay" class="overlay" style="display: none;">
+      <h2 style="font-size: 30px; color: #f43f5e;">CRASHED!</h2>
+      <button class="btn" id="restart-btn">RUN AGAIN</button>
+    </div>
+  </div>
+
+  <div class="hint">Controls: Space or Up Arrow to Jump · Down Arrow to Duck</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const scoreVal = document.getElementById('score-val');
+    const highVal = document.getElementById('high-val');
+    const startOverlay = document.getElementById('start-overlay');
+    const gameoverOverlay = document.getElementById('gameover-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+
+    let highScore = parseInt(localStorage.getItem('dino_highscore') || '0', 10);
+    highVal.textContent = String(highScore).padStart(5, '0');
+
+    let isRunning = false;
+    let score = 0;
+    let gameSpeed = 5.5;
+
+    // Dino
+    const groundY = 220;
+    const dino = {
+      x: 50,
+      y: groundY - 44,
+      w: 36,
+      h: 44,
+      vy: 0,
+      gravity: 0.7,
+      jump: -12.5,
+      isGrounded: true,
+      ducking: false
+    };
+
+    let obstacles = [];
+    let clouds = [
+      { x: 100, y: 50, s: 0.8 },
+      { x: 350, y: 70, s: 0.6 },
+      { x: 500, y: 40, s: 0.7 }
+    ];
+    let spawnTimer = 0;
+
+    // Audio FX
+    const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+    function jumpBeep() {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, audioCtx.currentTime + 0.08);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.08);
+      } catch (e) {}
+    }
+
+    function initGame() {
+      score = 0;
+      gameSpeed = 5.5;
+      dino.y = groundY - 44;
+      dino.vy = 0;
+      dino.isGrounded = true;
+      dino.ducking = false;
+      obstacles = [];
+      spawnTimer = 60;
+      startOverlay.style.display = 'none';
+      gameoverOverlay.style.display = 'none';
+      isRunning = true;
+      requestAnimationFrame(loop);
+    }
+
+    function jump() {
+      if (!isRunning) return;
+      if (dino.isGrounded) {
+        dino.vy = dino.jump;
+        dino.isGrounded = false;
+        jumpBeep();
+      }
+    }
+
+    function loop() {
+      if (!isRunning) return;
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', e => {
+      if (['Space', 'ArrowUp', 'KeyW'].includes(e.code)) {
+        e.preventDefault();
+        jump();
+      } else if (['ArrowDown', 'KeyS'].includes(e.code)) {
+        dino.ducking = true;
+      }
+    });
+    window.addEventListener('keyup', e => {
+      if (['ArrowDown', 'KeyS'].includes(e.code)) {
+        dino.ducking = false;
+      }
+    });
+
+    canvas.onclick = jump;
+
+    function update() {
+      score += 0.2;
+      scoreVal.textContent = String(Math.floor(score)).padStart(5, '0');
+      gameSpeed = 5.5 + Math.min(6, score * 0.005);
+
+      // Clouds
+      clouds.forEach(c => {
+        c.x -= c.s;
+        if (c.x < -80) c.x = canvas.width + 40;
+      });
+
+      // Dino physics
+      dino.vy += dino.gravity;
+      dino.y += dino.vy;
+
+      const currentH = dino.ducking && dino.isGrounded ? 26 : 44;
+      dino.h = currentH;
+
+      if (dino.y >= groundY - dino.h) {
+        dino.y = groundY - dino.h;
+        dino.vy = 0;
+        dino.isGrounded = true;
+      }
+
+      // Obstacle spawner
+      spawnTimer--;
+      if (spawnTimer <= 0) {
+        const isCactus = Math.random() > 0.3;
+        if (isCactus) {
+          const count = Math.random() > 0.6 ? 2 : 1;
+          obstacles.push({
+            type: 'cactus',
+            x: canvas.width,
+            y: groundY - 38,
+            w: count === 2 ? 32 : 18,
+            h: 38
+          });
+        } else {
+          // Flying bird
+          const highBird = Math.random() > 0.5;
+          obstacles.push({
+            type: 'bird',
+            x: canvas.width,
+            y: highBird ? groundY - 55 : groundY - 30,
+            w: 26,
+            h: 18
+          });
+        }
+        spawnTimer = Math.floor(Math.random() * 50) + 60;
+      }
+
+      // Obstacles update & collision
+      obstacles.forEach(o => {
+        o.x -= gameSpeed;
+
+        // Collision check
+        if (
+          dino.x < o.x + o.w &&
+          dino.x + dino.w > o.x &&
+          dino.y < o.y + o.h &&
+          dino.y + dino.h > o.y
+        ) {
+          // Crash!
+          isRunning = false;
+          const finalVal = Math.floor(score);
+          if (finalVal > highScore) {
+            highScore = finalVal;
+            localStorage.setItem('dino_highscore', highScore);
+            highVal.textContent = String(highScore).padStart(5, '0');
+          }
+          gameoverOverlay.style.display = 'flex';
+        }
+      });
+
+      obstacles = obstacles.filter(o => o.x + o.w > -20);
+    }
+
+    function draw() {
+      // Clear
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Clouds
+      ctx.fillStyle = '#334155';
+      clouds.forEach(c => {
+        ctx.fillRect(c.x, c.y, 40, 10);
+        ctx.fillRect(c.x + 8, c.y - 6, 24, 6);
+      });
+
+      // Ground line
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(canvas.width, groundY);
+      ctx.stroke();
+
+      // Dino
+      ctx.fillStyle = '#f59e0b';
+      ctx.shadowColor = '#d97706';
+      ctx.shadowBlur = 6;
+      ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
+      // Dino eye
+      ctx.fillStyle = '#020617';
+      ctx.fillRect(dino.x + dino.w - 8, dino.y + 6, 4, 4);
+
+      // Obstacles
+      obstacles.forEach(o => {
+        if (o.type === 'cactus') {
+          ctx.fillStyle = '#10b981';
+          ctx.shadowColor = '#059669';
+          ctx.shadowBlur = 6;
+          ctx.fillRect(o.x, o.y, o.w, o.h);
+        } else {
+          ctx.fillStyle = '#f43f5e';
+          ctx.shadowColor = '#e11d48';
+          ctx.shadowBlur = 6;
+          ctx.fillRect(o.x, o.y, o.w, o.h);
+          ctx.fillRect(o.x - 6, o.y + 4, 6, 8); // wing
+        }
+      });
+
+      ctx.shadowBlur = 0;
+    }
+
+    startBtn.onclick = () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    };
+    restartBtn.onclick = () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    };
+
+    draw();
+  </script>
+</body>
+</html>

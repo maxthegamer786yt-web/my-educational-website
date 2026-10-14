@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slope 3D</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      background: #020005;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 100%;
+      max-height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Courier New', monospace;
+      font-weight: 900;
+      font-size: 20px;
+      color: #38bdf8;
+      text-shadow: 0 0 10px rgba(56, 189, 248, 0.7);
+      pointer-events: none;
+      z-index: 10;
+    }
+    .hud span { color: #fff; }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 1, 10, 0.85);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      text-align: center;
+      z-index: 20;
+    }
+    .title {
+      font-size: 48px;
+      font-weight: 900;
+      background: linear-gradient(135deg, #a855f7, #38bdf8, #22c55e);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+    }
+    .btn {
+      background: #a855f7;
+      color: #fff;
+      border: none;
+      padding: 12px 32px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 0 25px rgba(168, 85, 247, 0.6);
+      transition: all 0.15s ease;
+    }
+    .btn:hover {
+      background: #c084fc;
+      transform: scale(1.05);
+      box-shadow: 0 0 35px rgba(192, 132, 252, 0.8);
+    }
+    .hint {
+      color: #94a3b8;
+      font-size: 14px;
+      font-family: monospace;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <div id="game-container">
+    <div class="hud">
+      <div>SCORE: <span id="score-val">0</span></div>
+      <div>BEST: <span id="best-val">0</span></div>
+      <div>SPEED: <span id="speed-val">1.0x</span></div>
+    </div>
+
+    <div id="start-overlay" class="overlay">
+      <div class="title">SLOPE 3D</div>
+      <p style="color: #cbd5e1; max-width: 380px; font-size: 14px;">
+        Steer the glowing ball down endless neon slopes! Avoid the red barrier blocks and falling off the edge.
+      </p>
+      <button class="btn" id="start-btn">PLAY NOW</button>
+      <div class="hint">Controls: A / D or Left / Right Arrows</div>
+    </div>
+
+    <div id="gameover-overlay" class="overlay" style="display: none;">
+      <div class="title" style="background: linear-gradient(135deg, #f43f5e, #fb7185); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">CRASHED!</div>
+      <p style="font-size: 18px; color: #cbd5e1;">Final Distance: <span id="final-score" style="color: #38bdf8; font-weight: bold;">0</span></p>
+      <button class="btn" id="restart-btn">PLAY AGAIN</button>
+      <div class="hint">Press Space or Enter to restart</div>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('game-container');
+    const scoreVal = document.getElementById('score-val');
+    const bestVal = document.getElementById('best-val');
+    const speedVal = document.getElementById('speed-val');
+    const finalScore = document.getElementById('final-score');
+    const startOverlay = document.getElementById('start-overlay');
+    const gameoverOverlay = document.getElementById('gameover-overlay');
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+
+    let highScore = parseInt(localStorage.getItem('slope_highscore') || '0', 10);
+    bestVal.textContent = highScore;
+
+    // Web Audio FX
+    const audioCtx = (window.AudioContext || window.webkitAudioContext) ? new (window.AudioContext || window.webkitAudioContext)() : null;
+    function playTone(freq, dur = 0.08, type = 'sine') {
+      if (!audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      } catch (e) {}
+    }
+
+    // Three.js Scene Setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x05010c);
+    scene.fog = new THREE.FogExp2(0x05010c, 0.008);
+
+    const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    // Ambient & Directional Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xa855f7, 1.2);
+    dirLight.position.set(10, 20, 10);
+    scene.add(dirLight);
+
+    // Player Ball
+    const ballRadius = 0.8;
+    const ballGeo = new THREE.SphereGeometry(ballRadius, 32, 32);
+    const ballMat = new THREE.MeshStandardMaterial({
+      color: 0x22c55e,
+      emissive: 0x10b981,
+      emissiveIntensity: 0.8,
+      roughness: 0.2,
+      metalness: 0.5
+    });
+    const ball = new THREE.Mesh(ballGeo, ballMat);
+    scene.add(ball);
+
+    // Track Tile Generator
+    const tiles = [];
+    const obstacles = [];
+    const TILE_LENGTH = 40;
+    const TILE_WIDTH = 14;
+
+    const tileColors = [0x7c3aed, 0x3b82f6, 0x06b6d4, 0x9333ea, 0x6366f1];
+
+    function createTile(zPos) {
+      const color = tileColors[Math.floor(Math.random() * tileColors.length)];
+      const geometry = new THREE.BoxGeometry(TILE_WIDTH, 1, TILE_LENGTH);
+      const material = new THREE.MeshStandardMaterial({
+        color: 0x0f0724,
+        roughness: 0.4,
+        metalness: 0.6
+      });
+      const tile = new THREE.Mesh(geometry, material);
+      tile.position.set(0, 0, zPos);
+
+      // Wireframe edge glow
+      const wireGeo = new THREE.EdgesGeometry(geometry);
+      const wireMat = new THREE.LineBasicMaterial({ color: color, linewidth: 2 });
+      const wireframe = new THREE.LineSegments(wireGeo, wireMat);
+      tile.add(wireframe);
+
+      scene.add(tile);
+      tiles.push(tile);
+
+      // Add obstacles on subsequent tiles
+      if (Math.abs(zPos) > 40) {
+        const count = Math.random() > 0.4 ? 2 : 1;
+        for (let i = 0; i < count; i++) {
+          const obsGeo = new THREE.BoxGeometry(2.2, 2.2, 2.2);
+          const obsMat = new THREE.MeshStandardMaterial({
+            color: 0xef4444,
+            emissive: 0xdc2626,
+            emissiveIntensity: 0.8
+          });
+          const obs = new THREE.Mesh(obsGeo, obsMat);
+          const xOffset = (Math.random() - 0.5) * (TILE_WIDTH - 4);
+          const zOffset = zPos + (Math.random() - 0.5) * (TILE_LENGTH - 8);
+          obs.position.set(xOffset, 1.6, zOffset);
+          scene.add(obs);
+          obstacles.push(obs);
+        }
+      }
+    }
+
+    // State Variables
+    let isRunning = false;
+    let score = 0;
+    let speed = 40;
+    let lateralSpeed = 0;
+    const MAX_LATERAL = 16;
+    const keys = {};
+
+    function initGame() {
+      // Clear existing
+      tiles.forEach(t => scene.remove(t));
+      obstacles.forEach(o => scene.remove(o));
+      tiles.length = 0;
+      obstacles.length = 0;
+
+      // Reset Ball
+      ball.position.set(0, ballRadius + 0.5, 0);
+      lateralSpeed = 0;
+      score = 0;
+      speed = 36;
+      scoreVal.textContent = '0';
+      speedVal.textContent = '1.0x';
+
+      // Build initial track
+      for (let i = 0; i < 8; i++) {
+        createTile(-i * TILE_LENGTH);
+      }
+
+      startOverlay.style.display = 'none';
+      gameoverOverlay.style.display = 'none';
+      isRunning = true;
+    }
+
+    function gameOver() {
+      if (!isRunning) return;
+      isRunning = false;
+      playTone(140, 0.4, 'sawtooth');
+
+      finalScore.textContent = Math.floor(score);
+      if (score > highScore) {
+        highScore = Math.floor(score);
+        localStorage.setItem('slope_highscore', highScore);
+        bestVal.textContent = highScore;
+      }
+      gameoverOverlay.style.display = 'flex';
+    }
+
+    // Input Handlers
+    window.addEventListener('keydown', e => {
+      keys[e.code] = true;
+      if (['Space', 'Enter'].includes(e.code) && !isRunning) {
+        initGame();
+      }
+    });
+    window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+    // Touch controls for mobile / iframe
+    let touchX = null;
+    window.addEventListener('touchstart', e => {
+      touchX = e.touches[0].clientX;
+    }, { passive: true });
+    window.addEventListener('touchmove', e => {
+      if (touchX !== null) {
+        const delta = e.touches[0].clientX - touchX;
+        ball.position.x += delta * 0.03;
+        touchX = e.touches[0].clientX;
+      }
+    }, { passive: true });
+    window.addEventListener('touchend', () => { touchX = null; });
+
+    startBtn.onclick = () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    };
+    restartBtn.onclick = () => {
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      initGame();
+    };
+
+    // Resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Clock
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
+
+      if (isRunning) {
+        // Accelerate forward speed
+        speed += delta * 1.5;
+        score += delta * (speed * 0.5);
+        scoreVal.textContent = Math.floor(score);
+        speedVal.textContent = (speed / 36).toFixed(1) + 'x';
+
+        // Steering input
+        if (keys['ArrowLeft'] || keys['KeyA']) {
+          lateralSpeed = Math.max(-MAX_LATERAL, lateralSpeed - delta * 45);
+        } else if (keys['ArrowRight'] || keys['KeyD']) {
+          lateralSpeed = Math.min(MAX_LATERAL, lateralSpeed + delta * 45);
+        } else {
+          lateralSpeed *= 0.88;
+        }
+
+        // Move Ball
+        ball.position.x += lateralSpeed * delta;
+        ball.position.z -= speed * delta;
+        ball.rotation.x -= speed * delta * 0.8;
+        ball.rotation.z += lateralSpeed * delta * 0.8;
+
+        // Fall check
+        if (Math.abs(ball.position.x) > TILE_WIDTH / 2 + 0.5) {
+          ball.position.y -= delta * 30;
+          if (ball.position.y < -15) {
+            gameOver();
+          }
+        }
+
+        // Camera Follow (Smooth dynamic angle behind ball)
+        camera.position.x = ball.position.x * 0.6;
+        camera.position.y = ball.position.y + 4.5;
+        camera.position.z = ball.position.z + 9;
+        camera.lookAt(ball.position.x, ball.position.y + 0.5, ball.position.z - 8);
+
+        // Track recycling
+        const lastTile = tiles[tiles.length - 1];
+        if (ball.position.z < lastTile.position.z + 160) {
+          createTile(lastTile.position.z - TILE_LENGTH);
+        }
+
+        // Remove old tiles & obstacles behind player
+        for (let i = tiles.length - 1; i >= 0; i--) {
+          if (tiles[i].position.z > ball.position.z + 50) {
+            scene.remove(tiles[i]);
+            tiles.splice(i, 1);
+          }
+        }
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+          const obs = obstacles[i];
+          if (obs.position.z > ball.position.z + 50) {
+            scene.remove(obs);
+            obstacles.splice(i, 1);
+          } else {
+            // Collision detection with obstacles
+            const dist = ball.position.distanceTo(obs.position);
+            if (dist < ballRadius + 1.2) {
+              gameOver();
+            }
+          }
+        }
+      } else {
+        // Idle camera rotation on start screen
+        camera.position.x = Math.sin(Date.now() * 0.001) * 6;
+        camera.position.y = 5;
+        camera.position.z = 10;
+        camera.lookAt(0, 1, -10);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
