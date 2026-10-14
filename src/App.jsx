@@ -7,9 +7,8 @@ import { FilterBar } from './components/FilterBar.jsx';
 import { GameCard } from './components/GameCard.jsx';
 import { GamePlayerModal } from './components/GamePlayerModal.jsx';
 import { TabCloakModal } from './components/TabCloakModal.jsx';
-import { PanicOverlay } from './components/PanicOverlay.jsx';
 import { Footer } from './components/Footer.jsx';
-import { AccessGate } from './components/AccessGate.jsx';
+import { EducationalPortal } from './components/EducationalPortal.jsx';
 import { AdminPanelModal } from './components/AdminPanelModal.jsx';
 import { applyTabCloak, getSavedTabCloak } from './utils/cloaker.js';
 import { isDeviceAuthorized, lockArcade, isAdminUser } from './utils/accessManager.js';
@@ -18,10 +17,11 @@ import { Gamepad2 } from 'lucide-react';
 const CATEGORIES = ['All', 'Casual', 'Action', 'Arcade', 'Puzzle', 'Sports', 'Shooter', 'Driving'];
 
 export default function App() {
-  // Remembered device check: requires 1-time code on first device use
-  const [isUnlocked, setIsUnlocked] = useState(() => isDeviceAuthorized());
+  // Entry point: defaults to the realistic Educational website disguise
+  const [currentView, setCurrentView] = useState('educational');
 
-  // Admin status
+  // Device authorization & Admin status
+  const [isUnlocked, setIsUnlocked] = useState(() => isDeviceAuthorized());
   const [isAdmin, setIsAdmin] = useState(() => isAdminUser());
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
@@ -47,18 +47,17 @@ export default function App() {
   // Modals & Active Game states
   const [activeGame, setActiveGame] = useState(null);
   const [isCloakModalOpen, setIsCloakModalOpen] = useState(false);
-  const [isPanicActive, setIsPanicActive] = useState(false);
   const [panicKey, setPanicKey] = useState(() => {
     return localStorage.getItem('goon_panic_key') || ']';
   });
 
-  // Initialize Tab Cloak on mount
+  // Initialize Tab Cloak on mount (defaults to Google Classroom)
   useEffect(() => {
     const saved = getSavedTabCloak();
     applyTabCloak(saved.presetId, saved.customTitle, saved.customIcon);
   }, []);
 
-  // Panic hotkey listener
+  // Panic & stealth hotkey listener (toggles between Educational site and Arcade)
   useEffect(() => {
     const handleKeyDown = (e) => {
       const target = e.target;
@@ -66,7 +65,7 @@ export default function App() {
 
       if (e.key === panicKey) {
         e.preventDefault();
-        setIsPanicActive((prev) => !prev);
+        setCurrentView((prev) => (prev === 'arcade' ? 'educational' : 'arcade'));
       }
     };
 
@@ -78,6 +77,15 @@ export default function App() {
   const handleLockArcade = () => {
     lockArcade();
     setIsUnlocked(false);
+    setIsAdmin(false);
+    setCurrentView('educational');
+  };
+
+  // Enter arcade from Educational entry point
+  const handleEnterArcadeFromEdu = (adminAccess) => {
+    setIsUnlocked(true);
+    setIsAdmin(Boolean(adminAccess || isAdminUser()));
+    setCurrentView('arcade');
   };
 
   // Favorite toggle
@@ -139,28 +147,19 @@ export default function App() {
     return result;
   }, [games, currentTab, activeCategory, searchQuery, sortBy, favorites]);
 
-  // Render Access Gate on first start if not unlocked
-  if (!isUnlocked) {
+  // View 1: Primary Website Entry Point (Authentic Educational Study Portal)
+  if (currentView === 'educational') {
     return (
-      <AccessGate
-        onUnlocked={(adminAccess) => {
-          setIsUnlocked(true);
-          setIsAdmin(Boolean(adminAccess || isAdminUser()));
-        }}
+      <EducationalPortal
+        onEnterArcade={handleEnterArcadeFromEdu}
+        panicKey={panicKey}
       />
     );
   }
 
+  // View 2: Unlocked Goon Arcade -moksh
   return (
     <div className="min-h-screen bg-[#05010a] text-purple-100 flex flex-col font-sans selection:bg-purple-600 selection:text-white">
-      {/* Panic Disguise Screen */}
-      {isPanicActive && (
-        <PanicOverlay
-          panicKey={panicKey}
-          onDismiss={() => setIsPanicActive(false)}
-        />
-      )}
-
       {/* Top Bar Header */}
       <Header
         currentTab={currentTab}
@@ -168,7 +167,7 @@ export default function App() {
         favoritesCount={favorites.length}
         onOpenCloakModal={() => setIsCloakModalOpen(true)}
         onRandomGame={handleRandomGame}
-        onTriggerPanic={() => setIsPanicActive(true)}
+        onTriggerPanic={() => setCurrentView('educational')}
         onLockArcade={handleLockArcade}
         isAdmin={isAdmin}
         onOpenAdminModal={() => setIsAdminModalOpen(true)}

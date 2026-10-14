@@ -58,7 +58,7 @@ export function applyTabCloak(presetId, customTitle, customIcon) {
 }
 
 export function getSavedTabCloak() {
-  const presetId = localStorage.getItem('goon_tab_cloak') || 'default';
+  const presetId = localStorage.getItem('goon_tab_cloak') || 'classroom';
   const customTitle = localStorage.getItem('goon_tab_cloak_custom_title') || '';
   const customIcon = localStorage.getItem('goon_tab_cloak_custom_icon') || '';
   return { presetId, customTitle, customIcon };
