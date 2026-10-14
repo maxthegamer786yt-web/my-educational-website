@@ -4,20 +4,38 @@
     "title": "Tiny Fishing",
     "slug": "tiny-fishing",
     "category": "Casual",
-    "description": "Cast your line into the deep waters, hook exotic underwater species, and earn cash to upgrade your line depth, hook capacity, and passive income.",
+    "description": "Cast your line into the deep sea, hook exotic fish, and upgrade your equipment to unlock legendary oceanic creatures.",
     "controls": [
-      "Click / Touch & Drag: Cast line and guide hook through fish",
-      "Shop: Upgrade depth, hook limit, and offline earnings"
+      "Click or Drag: Cast line and hook fish",
+      "Shop: Upgrade depth, hook limit, and passive earnings"
     ],
     "thumbnail": "",
-    "iframeUrl": "https://www.coolmathgames.com/0-tiny-fishing/play",
-    "iframeId": "html5game",
-    "allow": "web-share; clipboard-read; clipboard-write; autoplay; fullscreen",
-    "rating": 4.9,
-    "plays": 74500,
+    "iframeUrl": "https://html5.gamedistribution.com/5ee4b0222a474e44880b6c6d9f96754d/?gd_sdk_referrer_url=https://www.example.com/games/{game-path}",
+    "allow": "autoplay; fullscreen; gamepad",
+    "rating": 5.0,
+    "plays": 92400,
     "featured": true,
-    "author": "Mad Buffer / Coolmath Games",
-    "tags": ["Fishing", "Casual", "Upgrade", "Coolmath", "Arcade"]
+    "author": "GameDistribution",
+    "tags": ["Fishing", "Casual", "Upgrade", "HTML5"]
+  },
+  {
+    "id": "slope-3d",
+    "title": "Slope 3D",
+    "slug": "slope-3d",
+    "category": "Arcade",
+    "description": "High-speed endless 3D downhill runner! Steer the glowing ball down neon slopes, dodge red obstacle blocks, and survive as the speed constantly accelerates.",
+    "controls": [
+      "A / D or Left / Right Arrows: Steer the ball",
+      "Space / Enter: Restart on crash",
+      "Touch / Swipe: Steer on mobile"
+    ],
+    "thumbnail": "",
+    "iframeUrl": "./games/slope.html",
+    "rating": 5.0,
+    "plays": 58400,
+    "featured": false,
+    "author": "Rob Kay & Community",
+    "tags": ["Slope", "3D", "Runner", "Neon", "Arcade"]
   },
   {
     "id": "gta-v",
@@ -42,24 +60,5 @@
     "featured": false,
     "author": "DeloskiYT",
     "tags": ["GTA", "Action", "Open World", "Driving", "Shooter", "3D"]
-  },
-  {
-    "id": "slope-3d",
-    "title": "Slope 3D",
-    "slug": "slope-3d",
-    "category": "Arcade",
-    "description": "High-speed endless 3D downhill runner! Steer the glowing ball down neon slopes, dodge red obstacle blocks, and survive as the speed constantly accelerates.",
-    "controls": [
-      "A / D or Left / Right Arrows: Steer the ball",
-      "Space / Enter: Restart on crash",
-      "Touch / Swipe: Steer on mobile"
-    ],
-    "thumbnail": "",
-    "iframeUrl": "/games/slope.html",
-    "rating": 5.0,
-    "plays": 58400,
-    "featured": false,
-    "author": "Rob Kay & Community",
-    "tags": ["Slope", "3D", "Runner", "Neon", "Arcade"]
   }
 ]

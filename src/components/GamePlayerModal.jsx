@@ -189,6 +189,21 @@ export function GamePlayerModal({
           </div>
         </div>
 
+        {game.id === 'gta-v' && (
+          <div className="bg-purple-950/80 border-x border-b border-purple-800/60 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <span className="text-purple-200">
+              ⚡ WebAssembly requires isolated memory. If the embed displays an isolation notice:
+            </span>
+            <button
+              onClick={() => window.open(game.iframeUrl, '_blank')}
+              className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shrink-0"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Launch GTA V in Fullscreen Window</span>
+            </button>
+          </div>
+        )}
+
         {/* The Game Iframe Viewport */}
         <div
           ref={containerRef}
@@ -198,13 +213,10 @@ export function GamePlayerModal({
             ref={iframeRef}
             id={game.iframeId || "innerFrame"}
             name={game.iframeName || "innerFrame"}
-            src={game.iframeUrl}
+            src={game.iframeUrl?.startsWith('/') && !game.iframeUrl?.startsWith('//') ? '.' + game.iframeUrl : game.iframeUrl}
             title={game.title}
             className="w-full h-full border-0"
-            allow={game.allow || "cross-origin-isolated; fullscreen; autoplay; gamepad; keyboard-map; focus-without-user-activation *"}
-            referrerPolicy={game.referrerPolicy || "no-referrer"}
-            sandbox={game.sandbox ? game.sandbox : undefined}
-            style={{ overflow: 'auto' }}
+            allow="autoplay; fullscreen; gamepad; clipboard-read; clipboard-write; focus-without-user-activation *"
             allowFullScreen
           />
         </div>
