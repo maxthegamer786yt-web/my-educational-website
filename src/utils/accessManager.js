@@ -9,39 +9,59 @@ const STORAGE_KEY_LOCKDOWN = 'goon_lockdown_active';
 
 export const DEFAULT_ADMIN_CODE = 'MOKSH-ADMIN-777';
 
+function safeGet(key, fallback = null) {
+  try {
+    return localStorage.getItem(key) ?? fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+function safeSet(key, val) {
+  try {
+    localStorage.setItem(key, val);
+  } catch (e) {}
+}
+
+function safeRemove(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {}
+}
+
 export function getAdminCode() {
-  return localStorage.getItem(STORAGE_KEY_ADMIN_CODE) || DEFAULT_ADMIN_CODE;
+  return safeGet(STORAGE_KEY_ADMIN_CODE, DEFAULT_ADMIN_CODE) || DEFAULT_ADMIN_CODE;
 }
 
 export function setAdminCode(newCode) {
   if (!newCode || !newCode.trim()) return false;
-  localStorage.setItem(STORAGE_KEY_ADMIN_CODE, newCode.trim().toUpperCase());
+  safeSet(STORAGE_KEY_ADMIN_CODE, newCode.trim().toUpperCase());
   return true;
 }
 
 export function isAdminUser() {
-  return localStorage.getItem(STORAGE_KEY_IS_ADMIN) === 'true';
+  return safeGet(STORAGE_KEY_IS_ADMIN) === 'true';
 }
 
 export function setAdminUser(val) {
   if (val) {
-    localStorage.setItem(STORAGE_KEY_IS_ADMIN, 'true');
+    safeSet(STORAGE_KEY_IS_ADMIN, 'true');
   } else {
-    localStorage.removeItem(STORAGE_KEY_IS_ADMIN);
+    safeRemove(STORAGE_KEY_IS_ADMIN);
   }
 }
 
 export function isLockdownActive() {
-  return localStorage.getItem(STORAGE_KEY_LOCKDOWN) === 'true';
+  return safeGet(STORAGE_KEY_LOCKDOWN) === 'true';
 }
 
 export function setLockdown(val) {
-  localStorage.setItem(STORAGE_KEY_LOCKDOWN, val ? 'true' : 'false');
+  safeSet(STORAGE_KEY_LOCKDOWN, val ? 'true' : 'false');
 }
 
 export function getValidCodes() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY_VALID_CODES);
+    const saved = safeGet(STORAGE_KEY_VALID_CODES);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) return parsed;
@@ -52,7 +72,7 @@ export function getValidCodes() {
 
 export function getUsedCodes() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY_USED_CODES);
+    const saved = safeGet(STORAGE_KEY_USED_CODES);
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed)) return parsed;
@@ -69,12 +89,12 @@ export function verifyAndConsumeCode(inputCode) {
   const clean = inputCode.trim().toUpperCase();
   const currentAdminCode = getAdminCode();
 
-  // 1. Check if user entered the master Admin Code!
+  // 1. Check if user entered the master Admin Code
   if (clean === currentAdminCode) {
     setAdminUser(true);
-    localStorage.setItem(STORAGE_KEY_DEVICE_REMEMBERED, 'true');
-    localStorage.setItem('goon_device_auth_time', new Date().toISOString());
-    localStorage.setItem('goon_device_activated_code', 'ADMIN-ROOT');
+    safeSet(STORAGE_KEY_DEVICE_REMEMBERED, 'true');
+    safeSet('goon_device_auth_time', new Date().toISOString());
+    safeSet('goon_device_activated_code', 'ADMIN-ROOT');
     return { success: true, isAdmin: true, message: 'Admin verified! Full control granted.' };
   }
 
@@ -101,23 +121,20 @@ export function verifyAndConsumeCode(inputCode) {
   const isMatch = validCodes.some((c) => c.toUpperCase() === clean);
 
   if (isMatch) {
-    // Burn the code forever and track when it was used
     const record = {
       code: clean,
       usedAt: new Date().toISOString(),
     };
     const updatedUsed = [record, ...usedCodes];
-    localStorage.setItem(STORAGE_KEY_USED_CODES, JSON.stringify(updatedUsed));
+    safeSet(STORAGE_KEY_USED_CODES, JSON.stringify(updatedUsed));
 
-    // Remove from active valid pool
     const updatedValid = validCodes.filter((c) => c.toUpperCase() !== clean);
-    localStorage.setItem(STORAGE_KEY_VALID_CODES, JSON.stringify(updatedValid));
+    safeSet(STORAGE_KEY_VALID_CODES, JSON.stringify(updatedValid));
 
-    // Permanently authorize this device
     setAdminUser(false);
-    localStorage.setItem(STORAGE_KEY_DEVICE_REMEMBERED, 'true');
-    localStorage.setItem('goon_device_auth_time', new Date().toISOString());
-    localStorage.setItem('goon_device_activated_code', clean);
+    safeSet(STORAGE_KEY_DEVICE_REMEMBERED, 'true');
+    safeSet('goon_device_auth_time', new Date().toISOString());
+    safeSet('goon_device_activated_code', clean);
 
     return { success: true, isAdmin: false };
   }
@@ -132,14 +149,13 @@ export function isDeviceAuthorized() {
   if (isLockdownActive() && !isAdminUser()) {
     return false;
   }
-  return localStorage.getItem(STORAGE_KEY_DEVICE_REMEMBERED) === 'true';
+  return safeGet(STORAGE_KEY_DEVICE_REMEMBERED) === 'true';
 }
 
 export function lockArcade() {
-  localStorage.removeItem(STORAGE_KEY_DEVICE_REMEMBERED);
+  safeRemove(STORAGE_KEY_DEVICE_REMEMBERED);
 }
 
-// Admin generator utility: generates clean, readable 1-time codes
 export function generateRandomCode(prefix = 'GOON') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let part1 = '';
@@ -158,18 +174,17 @@ export function generateBatchCodes(count = 5, prefix = 'GOON') {
   }
   const current = getValidCodes();
   const merged = Array.from(new Set([...current, ...newCodes]));
-  localStorage.setItem(STORAGE_KEY_VALID_CODES, JSON.stringify(merged));
+  safeSet(STORAGE_KEY_VALID_CODES, JSON.stringify(merged));
   return newCodes;
 }
 
 export function revokeCode(codeToRevoke) {
   const current = getValidCodes();
   const filtered = current.filter((c) => c.toUpperCase() !== codeToRevoke.toUpperCase());
-  localStorage.setItem(STORAGE_KEY_VALID_CODES, JSON.stringify(filtered));
+  safeSet(STORAGE_KEY_VALID_CODES, JSON.stringify(filtered));
   return filtered;
 }
 
 export function revokeAllAuthorizations() {
-  // Clears device authorizations
-  localStorage.removeItem(STORAGE_KEY_DEVICE_REMEMBERED);
+  safeRemove(STORAGE_KEY_DEVICE_REMEMBERED);
 }
